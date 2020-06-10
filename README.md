@@ -1,6 +1,6 @@
 # RxPermissions
 
-[![](https://jitpack.io/v/tbruyelle/RxPermissions.svg)](https://jitpack.io/#tbruyelle/RxPermissions) [![BuildVersion](https://buildstats.info/nuget/RxPermissions)](https://www.nuget.org/packages/RxPermissions/) [![Build Status](https://api.travis-ci.org/tbruyelle/RxPermissions.svg?branch=master)](https://travis-ci.org/tbruyelle/RxPermissions)
+[![](https://jitpack.io/v/cmcy/RxPermissions.svg)](https://jitpack.io/#cmcy/RxPermissions)
 
 This library allows the usage of RxJava with the new Android M permission model.
 
@@ -17,26 +17,19 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.tbruyelle:rxpermissions:0.10.2'
+    implementation 'com.github.cmcy:RxPermissions:1.0.0'
 }
 ```
 
 ## Usage
 
-Create a `RxPermissions` instance :
-
-```java
-final RxPermissions rxPermissions = new RxPermissions(this); // where this is an Activity or Fragment instance
-```
-
-**NOTE:** `new RxPermissions(this)` the `this` parameter can be a FragmentActivity or a Fragment. If you are using `RxPermissions` inside of a fragment you should pass the fragment instance(`new RxPermissions(this)`) as constructor parameter rather than `new RxPermissions(fragment.getActivity())` or you could face a `java.lang.IllegalStateException: FragmentManager is already executing transactions`.  
 
 Example : request the CAMERA permission (with Retrolambda for brevity, but not required)
 
 ```java
 // Must be done during an initialization phase like onCreate
-rxPermissions
-    .request(Manifest.permission.CAMERA)
+RxPermissions
+    .request(this, Manifest.permission.CAMERA)
     .subscribe(granted -> {
         if (granted) { // Always true pre-M
            // I can control the camera now
@@ -45,6 +38,11 @@ rxPermissions
         }
     });
 ```
+
+**NOTE:** `.request(this, Manifest.permission.CAMERA)` the `this` parameter can be a FragmentActivity or a Fragment. If you are using `RxPermissions` inside of a fragment you should pass the fragment instance(`.xxx(this,...)`) as constructor parameter rather than `.xxx(fragment.getActivity(),...)` or you could face a `java.lang.IllegalStateException: FragmentManager is already executing transactions`.  
+
+
+## Other
 
 If you need to trigger the permission request from a specific event, you need to setup your event
 as an observable inside an initialization phase.
@@ -57,7 +55,7 @@ Example :
 ```java
 // Must be done during an initialization phase like onCreate
 RxView.clicks(findViewById(R.id.enableCamera))
-    .compose(rxPermissions.ensure(Manifest.permission.CAMERA))
+    .compose(RxPermissions.ensure(this, Manifest.permission.CAMERA))
     .subscribe(granted -> {
         // R.id.enableCamera has been clicked
     });
@@ -66,8 +64,8 @@ RxView.clicks(findViewById(R.id.enableCamera))
 If multiple permissions at the same time, the result is combined :
 
 ```java
-rxPermissions
-    .request(Manifest.permission.CAMERA,
+RxPermissions
+    .request(this, Manifest.permission.CAMERA,
              Manifest.permission.READ_PHONE_STATE)
     .subscribe(granted -> {
         if (granted) {
@@ -81,8 +79,8 @@ rxPermissions
 You can also observe a detailed result with `requestEach` or `ensureEach` :
 
 ```java
-rxPermissions
-    .requestEach(Manifest.permission.CAMERA,
+RxPermissions
+    .requestEach(this, Manifest.permission.CAMERA,
              Manifest.permission.READ_PHONE_STATE)
     .subscribe(permission -> { // will emit 2 Permission objects
         if (permission.granted) {
@@ -99,8 +97,8 @@ rxPermissions
 You can also get combined detailed result with `requestEachCombined` or `ensureEachCombined` :
 
 ```java
-rxPermissions
-    .requestEachCombined(Manifest.permission.CAMERA,
+RxPermissions
+    .requestEachCombined(this, Manifest.permission.CAMERA,
              Manifest.permission.READ_PHONE_STATE)
     .subscribe(permission -> { // will emit 1 Permission object
         if (permission.granted) {
