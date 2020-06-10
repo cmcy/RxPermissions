@@ -29,15 +29,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        RxPermissions rxPermissions = new RxPermissions(this);
-        rxPermissions.setLogging(true);
+//        RxPermissions rxPermissions = new RxPermissions(this);
 
         setContentView(R.layout.act_main);
         surfaceView = findViewById(R.id.surfaceView);
 
         disposable = RxView.clicks(findViewById(R.id.enableCamera))
                 // Ask for permissions when button is clicked
-                .compose(rxPermissions.ensureEach(permission.CAMERA))
+                .compose(RxPermissions.ensureEach(this, permission.CAMERA))
                 .subscribe(new Consumer<Permission>() {
                                @Override
                                public void accept(Permission permission) {

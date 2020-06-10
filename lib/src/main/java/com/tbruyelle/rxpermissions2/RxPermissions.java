@@ -16,12 +16,14 @@ package com.tbruyelle.rxpermissions2;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
+import android.support.v4.content.ContextCompat;
 import android.text.TextUtils;
 
 import java.util.ArrayList;
@@ -39,18 +41,38 @@ public class RxPermissions {
     static final Object TRIGGER = new Object();
 
     @VisibleForTesting
-    Lazy<RxPermissionsFragment> mRxPermissionsFragment;
+//    static Lazy<RxPermissionsFragment> mRxPermissionsFragment;
 
-    public RxPermissions(@NonNull final FragmentActivity activity) {
-        mRxPermissionsFragment = getLazySingleton(activity.getSupportFragmentManager());
+//    public RxPermissions(@NonNull final Context context) {
+//        this((Activity) context);
+//    }
+//
+//    public RxPermissions(@NonNull final Activity activity) {
+//        if(!(activity instanceof FragmentActivity)){
+//            throw new ClassCastException("The parent class of an Activity must be FragmentActivity");
+//        }
+//        FragmentActivity fragmentActivity = (FragmentActivity) activity;
+//        Lazy<RxPermissionsFragment> mRxPermissionsFragment = getLazySingleton(fragmentActivity.getSupportFragmentManager());
+//    }
+//
+//    public RxPermissions(@NonNull final Fragment fragment) {
+//        Lazy<RxPermissionsFragment> mRxPermissionsFragment = getLazySingleton(fragment.getChildFragmentManager());
+//    }
+
+    private static Lazy<RxPermissionsFragment> getPermissionsFragment(@NonNull final Activity activity){
+        if(!(activity instanceof FragmentActivity)){
+            throw new ClassCastException("The parent class of an Activity must be FragmentActivity");
+        }
+        FragmentActivity fragmentActivity = (FragmentActivity) activity;
+        return getLazySingleton(fragmentActivity.getSupportFragmentManager());
     }
 
-    public RxPermissions(@NonNull final Fragment fragment) {
-        mRxPermissionsFragment = getLazySingleton(fragment.getChildFragmentManager());
+    private static Lazy<RxPermissionsFragment> getPermissionsFragment(@NonNull final Fragment fragment){
+        return getLazySingleton(fragment.getChildFragmentManager());
     }
 
     @NonNull
-    private Lazy<RxPermissionsFragment> getLazySingleton(@NonNull final FragmentManager fragmentManager) {
+    private static Lazy<RxPermissionsFragment> getLazySingleton(@NonNull final FragmentManager fragmentManager) {
         return new Lazy<RxPermissionsFragment>() {
 
             private RxPermissionsFragment rxPermissionsFragment;
@@ -66,7 +88,7 @@ public class RxPermissions {
         };
     }
 
-    private RxPermissionsFragment getRxPermissionsFragment(@NonNull final FragmentManager fragmentManager) {
+    private static RxPermissionsFragment getRxPermissionsFragment(@NonNull final FragmentManager fragmentManager) {
         RxPermissionsFragment rxPermissionsFragment = findRxPermissionsFragment(fragmentManager);
         boolean isNewInstance = rxPermissionsFragment == null;
         if (isNewInstance) {
@@ -79,12 +101,25 @@ public class RxPermissions {
         return rxPermissionsFragment;
     }
 
-    private RxPermissionsFragment findRxPermissionsFragment(@NonNull final FragmentManager fragmentManager) {
+    private static RxPermissionsFragment findRxPermissionsFragment(@NonNull final FragmentManager fragmentManager) {
         return (RxPermissionsFragment) fragmentManager.findFragmentByTag(TAG);
     }
 
-    public void setLogging(boolean logging) {
-        mRxPermissionsFragment.get().setLogging(logging);
+//    public void setLogging(boolean logging) {
+//        mRxPermissionsFragment.get().setLogging(logging);
+//    }
+
+    /**
+     * Map emitted items from the source observable into {@code true} if permissions in parameters
+     * are granted, or {@code false} if not.
+     * <p>
+     * If one or several permissions have never been requested, invoke the related framework method
+     * to ask the user if he allows the permissions.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static <T> ObservableTransformer<T, Boolean> ensure(final Activity activity, final String... permissions) {
+        Lazy<RxPermissionsFragment> mRxPermissionsFragment = getPermissionsFragment(activity);
+        return ensure(mRxPermissionsFragment, permissions);
     }
 
     /**
@@ -95,11 +130,16 @@ public class RxPermissions {
      * to ask the user if he allows the permissions.
      */
     @SuppressWarnings("WeakerAccess")
-    public <T> ObservableTransformer<T, Boolean> ensure(final String... permissions) {
+    public static <T> ObservableTransformer<T, Boolean> ensure(final Fragment fragment, final String... permissions) {
+        Lazy<RxPermissionsFragment> mRxPermissionsFragment = getPermissionsFragment(fragment);
+        return ensure(mRxPermissionsFragment, permissions);
+    }
+
+    private static <T> ObservableTransformer<T, Boolean> ensure(final Lazy<RxPermissionsFragment> mRxPermissionsFragment, final String... permissions) {
         return new ObservableTransformer<T, Boolean>() {
             @Override
             public ObservableSource<Boolean> apply(Observable<T> o) {
-                return request(o, permissions)
+                return request(mRxPermissionsFragment, o, permissions)
                         // Transform Observable<Permission> to Observable<Boolean>
                         .buffer(permissions.length)
                         .flatMap(new Function<List<Permission>, ObservableSource<Boolean>>() {
@@ -122,6 +162,25 @@ public class RxPermissions {
                         });
             }
         };
+
+//        return o -> request(mRxPermissionsFragment, o, permissions)
+//                // Transform Observable<Permission> to Observable<Boolean>
+//                .buffer(permissions.length)
+//                .flatMap((Function<List<Permission>, ObservableSource<Boolean>>) permissions1 -> {
+//                    if (permissions1.isEmpty()) {
+//                        // Occurs during orientation change, when the subject receives onComplete.
+//                        // In that case we don't want to propagate that empty list to the
+//                        // subscriber, only the onComplete.
+//                        return Observable.empty();
+//                    }
+//                    // Return true if all permissions are granted.
+//                    for (Permission p : permissions1) {
+//                        if (!p.granted) {
+//                            return Observable.just(false);
+//                        }
+//                    }
+//                    return Observable.just(true);
+//                });
     }
 
     /**
@@ -132,13 +191,36 @@ public class RxPermissions {
      * to ask the user if he allows the permissions.
      */
     @SuppressWarnings("WeakerAccess")
-    public <T> ObservableTransformer<T, Permission> ensureEach(final String... permissions) {
+    public static <T> ObservableTransformer<T, Permission> ensureEach(final Activity activity, final String... permissions) {
+        final Lazy<RxPermissionsFragment> mRxPermissionsFragment = getPermissionsFragment(activity);
         return new ObservableTransformer<T, Permission>() {
             @Override
             public ObservableSource<Permission> apply(Observable<T> o) {
-                return request(o, permissions);
+                return request(mRxPermissionsFragment, o, permissions);
             }
         };
+
+//        return o -> request(mRxPermissionsFragment, o, permissions);
+    }
+
+    /**
+     * Map emitted items from the source observable into {@link Permission} objects for each
+     * permission in parameters.
+     * <p>
+     * If one or several permissions have never been requested, invoke the related framework method
+     * to ask the user if he allows the permissions.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static <T> ObservableTransformer<T, Permission> ensureEach(final Fragment fragment, final String... permissions) {
+        final Lazy<RxPermissionsFragment> mRxPermissionsFragment = getPermissionsFragment(fragment);
+        return new ObservableTransformer<T, Permission>() {
+            @Override
+            public ObservableSource<Permission> apply(Observable<T> o) {
+                return request(mRxPermissionsFragment, o, permissions);
+            }
+        };
+
+//        return o -> request(mRxPermissionsFragment, o, permissions);
     }
 
     /**
@@ -148,11 +230,12 @@ public class RxPermissions {
      * If one or several permissions have never been requested, invoke the related framework method
      * to ask the user if he allows the permissions.
      */
-    public <T> ObservableTransformer<T, Permission> ensureEachCombined(final String... permissions) {
+    public static <T> ObservableTransformer<T, Permission> ensureEachCombined(final Activity activity, final String... permissions) {
+        final Lazy<RxPermissionsFragment> mRxPermissionsFragment = getPermissionsFragment(activity);
         return new ObservableTransformer<T, Permission>() {
             @Override
             public ObservableSource<Permission> apply(Observable<T> o) {
-                return request(o, permissions)
+                return request(mRxPermissionsFragment, o, permissions)
                         .buffer(permissions.length)
                         .flatMap(new Function<List<Permission>, ObservableSource<Permission>>() {
                             @Override
@@ -165,48 +248,81 @@ public class RxPermissions {
                         });
             }
         };
+
+//        return o -> request(mRxPermissionsFragment, o, permissions)
+//                .buffer(permissions.length)
+//                .flatMap((Function<List<Permission>, ObservableSource<Permission>>) permissions1 -> {
+//                    if (permissions1.isEmpty()) {
+//                        return Observable.empty();
+//                    }
+//                    return Observable.just(new Permission(permissions1));
+//                });
+
+
     }
 
     /**
      * Request permissions immediately, <b>must be invoked during initialization phase
      * of your application</b>.
      */
-    @SuppressWarnings({"WeakerAccess", "unused"})
-    public Observable<Boolean> request(final String... permissions) {
-        return Observable.just(TRIGGER).compose(ensure(permissions));
+    @SuppressWarnings({"unused"})
+    public static Observable<Boolean> request(final Activity activity, final String... permissions) {
+        return Observable.just(TRIGGER).compose(ensure(activity, permissions));
     }
 
     /**
      * Request permissions immediately, <b>must be invoked during initialization phase
      * of your application</b>.
      */
-    @SuppressWarnings({"WeakerAccess", "unused"})
-    public Observable<Permission> requestEach(final String... permissions) {
-        return Observable.just(TRIGGER).compose(ensureEach(permissions));
+    @SuppressWarnings({"unused"})
+    public static Observable<Boolean> request(final Fragment fragment, final String... permissions) {
+        return Observable.just(TRIGGER).compose(ensure(fragment, permissions));
     }
 
     /**
      * Request permissions immediately, <b>must be invoked during initialization phase
      * of your application</b>.
      */
-    public Observable<Permission> requestEachCombined(final String... permissions) {
-        return Observable.just(TRIGGER).compose(ensureEachCombined(permissions));
+    @SuppressWarnings({"unused"})
+    public static Observable<Permission> requestEach(final Activity activity, final String... permissions) {
+        return Observable.just(TRIGGER).compose(ensureEach(activity, permissions));
     }
 
-    private Observable<Permission> request(final Observable<?> trigger, final String... permissions) {
+    /**
+     * Request permissions immediately, <b>must be invoked during initialization phase
+     * of your application</b>.
+     */
+    @SuppressWarnings({"unused"})
+    public static Observable<Permission> requestEach(final Fragment fragment, final String... permissions) {
+        return Observable.just(TRIGGER).compose(ensureEach(fragment, permissions));
+    }
+
+    /**
+     * Request permissions immediately, <b>must be invoked during initialization phase
+     * of your application</b>.
+     */
+    public static Observable<Permission> requestEachCombined(final Activity activity, final String... permissions) {
+        return Observable.just(TRIGGER).compose(ensureEachCombined(activity, permissions));
+    }
+
+    private static Observable<Permission> request(final Lazy<RxPermissionsFragment> mRxPermissionsFragment, final Observable<?> trigger, final String... permissions) {
         if (permissions == null || permissions.length == 0) {
             throw new IllegalArgumentException("RxPermissions.request/requestEach requires at least one input permission");
         }
-        return oneOf(trigger, pending(permissions))
+
+        return oneOf(trigger, pending(mRxPermissionsFragment, permissions))
                 .flatMap(new Function<Object, Observable<Permission>>() {
                     @Override
                     public Observable<Permission> apply(Object o) {
-                        return requestImplementation(permissions);
+                        return requestImplementation(mRxPermissionsFragment, permissions);
                     }
                 });
+
+//        return oneOf(trigger, pending(mRxPermissionsFragment, permissions))
+//                .flatMap((Function<Object, Observable<Permission>>) o -> requestImplementation(mRxPermissionsFragment, permissions));
     }
 
-    private Observable<?> pending(final String... permissions) {
+    private static Observable<?> pending(Lazy<RxPermissionsFragment> mRxPermissionsFragment, final String... permissions) {
         for (String p : permissions) {
             if (!mRxPermissionsFragment.get().containsByPermission(p)) {
                 return Observable.empty();
@@ -215,7 +331,7 @@ public class RxPermissions {
         return Observable.just(TRIGGER);
     }
 
-    private Observable<?> oneOf(Observable<?> trigger, Observable<?> pending) {
+    private static Observable<?> oneOf(Observable<?> trigger, Observable<?> pending) {
         if (trigger == null) {
             return Observable.just(TRIGGER);
         }
@@ -223,7 +339,7 @@ public class RxPermissions {
     }
 
     @TargetApi(Build.VERSION_CODES.M)
-    private Observable<Permission> requestImplementation(final String... permissions) {
+    private static Observable<Permission> requestImplementation(Lazy<RxPermissionsFragment> mRxPermissionsFragment, final String... permissions) {
         List<Observable<Permission>> list = new ArrayList<>(permissions.length);
         List<String> unrequestedPermissions = new ArrayList<>();
 
@@ -231,14 +347,14 @@ public class RxPermissions {
         // At the end, the observables are combined to have a unique response.
         for (String permission : permissions) {
             mRxPermissionsFragment.get().log("Requesting permission " + permission);
-            if (isGranted(permission)) {
+            if (isGranted(mRxPermissionsFragment, permission)) {
                 // Already granted, or not Android M
                 // Return a granted Permission object.
                 list.add(Observable.just(new Permission(permission, true, false)));
                 continue;
             }
 
-            if (isRevoked(permission)) {
+            if (isRevoked(mRxPermissionsFragment, permission)) {
                 // Revoked by a policy, return a denied Permission object.
                 list.add(Observable.just(new Permission(permission, false, false)));
                 continue;
@@ -257,7 +373,7 @@ public class RxPermissions {
 
         if (!unrequestedPermissions.isEmpty()) {
             String[] unrequestedPermissionsArray = unrequestedPermissions.toArray(new String[unrequestedPermissions.size()]);
-            requestPermissionsFromFragment(unrequestedPermissionsArray);
+            requestPermissionsFromFragment(mRxPermissionsFragment, unrequestedPermissionsArray);
         }
         return Observable.concat(Observable.fromIterable(list));
     }
@@ -274,8 +390,7 @@ public class RxPermissions {
      * <p>
      * For SDK &lt; 23, the observable will always emit false.
      */
-    @SuppressWarnings("WeakerAccess")
-    public Observable<Boolean> shouldShowRequestPermissionRationale(final Activity activity, final String... permissions) {
+    public static Observable<Boolean> shouldShowRequestPermissionRationale(final Activity activity, final String... permissions) {
         if (!isMarshmallow()) {
             return Observable.just(false);
         }
@@ -283,9 +398,10 @@ public class RxPermissions {
     }
 
     @TargetApi(Build.VERSION_CODES.M)
-    private boolean shouldShowRequestPermissionRationaleImplementation(final Activity activity, final String... permissions) {
+    private static boolean shouldShowRequestPermissionRationaleImplementation(final Activity activity, final String... permissions) {
+        Lazy<RxPermissionsFragment> mRxPermissionsFragment = getPermissionsFragment(activity);
         for (String p : permissions) {
-            if (!isGranted(p) && !activity.shouldShowRequestPermissionRationale(p)) {
+            if (!isGranted(mRxPermissionsFragment, p) && !activity.shouldShowRequestPermissionRationale(p)) {
                 return false;
             }
         }
@@ -293,7 +409,7 @@ public class RxPermissions {
     }
 
     @TargetApi(Build.VERSION_CODES.M)
-    void requestPermissionsFromFragment(String[] permissions) {
+    private static void requestPermissionsFromFragment(Lazy<RxPermissionsFragment> mRxPermissionsFragment, String[] permissions) {
         mRxPermissionsFragment.get().log("requestPermissionsFromFragment " + TextUtils.join(", ", permissions));
         mRxPermissionsFragment.get().requestPermissions(permissions);
     }
@@ -303,8 +419,7 @@ public class RxPermissions {
      * <p>
      * Always true if SDK &lt; 23.
      */
-    @SuppressWarnings("WeakerAccess")
-    public boolean isGranted(String permission) {
+    private static boolean isGranted(Lazy<RxPermissionsFragment> mRxPermissionsFragment, String permission) {
         return !isMarshmallow() || mRxPermissionsFragment.get().isGranted(permission);
     }
 
@@ -313,17 +428,21 @@ public class RxPermissions {
      * <p>
      * Always false if SDK &lt; 23.
      */
-    @SuppressWarnings("WeakerAccess")
-    public boolean isRevoked(String permission) {
+    private static boolean isRevoked(Lazy<RxPermissionsFragment> mRxPermissionsFragment, String permission) {
         return isMarshmallow() && mRxPermissionsFragment.get().isRevoked(permission);
     }
 
-    boolean isMarshmallow() {
+    private static boolean isMarshmallow() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
     }
 
-    void onRequestPermissionsResult(String permissions[], int[] grantResults) {
+    void onRequestPermissionsResult(Lazy<RxPermissionsFragment> mRxPermissionsFragment, String[] permissions, int[] grantResults) {
         mRxPermissionsFragment.get().onRequestPermissionsResult(permissions, grantResults, new boolean[permissions.length]);
+    }
+
+
+    public static boolean lacksPermission(Activity activity, String permission) {
+        return ContextCompat.checkSelfPermission(activity, permission) != PackageManager.PERMISSION_DENIED;
     }
 
     @FunctionalInterface
