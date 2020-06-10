@@ -39,7 +39,7 @@ RxPermissions
     });
 ```
 
-**NOTE:** `.request(this, Manifest.permission.CAMERA)` the `this` parameter can be a FragmentActivity or a Fragment. If you are using `RxPermissions` inside of a fragment you should pass the fragment instance(`new RxPermissions(this)`) as constructor parameter rather than `new RxPermissions(fragment.getActivity())` or you could face a `java.lang.IllegalStateException: FragmentManager is already executing transactions`.  
+**NOTE:** `.request(this, Manifest.permission.CAMERA)` the `this` parameter can be a FragmentActivity or a Fragment. If you are using `RxPermissions` inside of a fragment you should pass the fragment instance(`.xxx(this,...)`) as constructor parameter rather than `.xxx(fragment.getActivity(),...)` or you could face a `java.lang.IllegalStateException: FragmentManager is already executing transactions`.  
 
 
 ## Other
