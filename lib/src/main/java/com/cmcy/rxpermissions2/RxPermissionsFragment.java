@@ -1,4 +1,4 @@
-package com.tbruyelle.rxpermissions2;
+package com.cmcy.rxpermissions2;
 
 import android.annotation.TargetApi;
 import android.content.pm.PackageManager;

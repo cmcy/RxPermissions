@@ -1,4 +1,4 @@
-package com.tbruyelle.rxpermissions2.sample;
+package com.cmcy.rxpermissions2.sample;
 
 import android.Manifest.permission;
 import android.hardware.Camera;
@@ -9,8 +9,8 @@ import android.view.SurfaceView;
 import android.widget.Toast;
 
 import com.jakewharton.rxbinding2.view.RxView;
-import com.tbruyelle.rxpermissions2.Permission;
-import com.tbruyelle.rxpermissions2.RxPermissions;
+import com.cmcy.rxpermissions2.Permission;
+import com.cmcy.rxpermissions2.RxPermissions;
 
 import java.io.IOException;
 

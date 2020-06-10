@@ -1,4 +1,4 @@
-package com.tbruyelle.rxpermissions2;
+package com.cmcy.rxpermissions2;
 
 import java.util.List;
 

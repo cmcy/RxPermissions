@@ -4,7 +4,7 @@ android {
     compileSdkVersion rootProject.ext.compileSdkVersion
 
     defaultConfig {
-        applicationId "com.tbruyelle.rxpermissions.sample"
+        applicationId "com.cmcy.rxpermissions.sample"
         minSdkVersion 14
 
         targetSdkVersion rootProject.ext.targetSdkVersion
